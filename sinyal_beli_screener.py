@@ -106,8 +106,6 @@ def screen_stock(ticker):
     return None
 
 def send_telegram_message(token, chat_id, message):
-    token = os.getenv('BOT_TOKEN')
-    chat_id = os.getenv('CHAT_ID')
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     data = {"chat_id": chat_id, "text": message}
     response = requests.post(url, data=data)
@@ -115,6 +113,7 @@ def send_telegram_message(token, chat_id, message):
         print("✅ Notifikasi Telegram terkirim!")
     else:
         print(f"❌ Gagal kirim notifikasi: {response.text}")
+
 
 def format_telegram_message(df_result, max_items=25):
     today = datetime.now().strftime("%d %B %Y")
@@ -141,8 +140,18 @@ else:
     df_result.reset_index(drop=True, inplace=True)
     print(df_result)
 
-    # Kirim notif Telegram
-    BOT_TOKEN = os.getenv('BOT_TOKEN')  # Use the environment variable for token
-    CHAT_ID = os.getenv('CHAT_ID')  # Use the environment variable for chat ID
+# Ambil token dan chat id dari env
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
+
+if len(results) == 0:
+    print("❗ Tidak ada saham yang memenuhi kriteria screening")
+else:
+    df_result = pd.DataFrame(results)
+    df_result = df_result.sort_values(by=["Score", "MarketCap"], ascending=[False, False])
+    df_result.reset_index(drop=True, inplace=True)
+    print(df_result)
+
     pesan = format_telegram_message(df_result)
     send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
+
