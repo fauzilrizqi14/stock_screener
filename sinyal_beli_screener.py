@@ -139,7 +139,7 @@ else:
     df_result = pd.DataFrame(results)
     df_result = df_result.sort_values(by=["Score", "MarketCap"], ascending=[False, False])
     df_result.reset_index(drop=True, inplace=True)
-    display(df_result)
+    print(df_result)
 
     # Kirim notif Telegram
     BOT_TOKEN = os.getenv('BOT_TOKEN')  # Use the environment variable for token
