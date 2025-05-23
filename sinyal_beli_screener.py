@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # Load Excel
-df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/stock_screener/Daftar%20Saham%20-%2020250523.xlsx')
+df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20-%2020250523.xlsx')
 
 # Pastikan kolom 'Saham' numeric dan drop data invalid
 df['Saham'] = pd.to_numeric(df['Saham'], errors='coerce')
