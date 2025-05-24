@@ -24,6 +24,7 @@ def authorize_gspread(creds_json_path="credentials.json"):
 
     creds = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
     client = gspread.authorize(creds)
+    return client
     
 # --- Setup Telegram ID ---    
 BOT_TOKEN = os.getenv('BOT_TOKEN')
