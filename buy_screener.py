@@ -23,6 +23,10 @@ market_caps_shares = dict(zip(df_shares['Kode'].astype(str), df_shares['Saham'])
 tickers = df['Kode'].dropna().astype(str) + '.JK'
 tickers = tickers.tolist()
 
+# --- Setup Telegram ID ---    
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
+
 def load_config_from_sheet(sheet_name="config_screener"):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -290,8 +294,8 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
     return None
 
 def send_telegram_message(token, chat_id, message):
-    url = f"https://api.telegram.org/bot7487407302:AAGe6I8fLFGt19BfU7AFh31YMHaFVHUmu7U/sendMessage"
-    data = {"chat_id": 652946372, "text": message}
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    data = {"chat_id": chat_id, "text": message}
     response = requests.post(url, data=data)
     if response.status_code == 200:
         print("✅ Notifikasi Telegram terkirim!")
@@ -300,7 +304,7 @@ def send_telegram_message(token, chat_id, message):
 
 def format_telegram_message(df_result, max_items=MAX_ITEM_TELE):
     today = datetime.now().strftime("%d %B %Y")
-    message = f"📈 Rekomendasi Saham Hari Ini ({today}):\n\n"
+    message = f"📈 Rekomendasi *BELI SAHAM* Hari Ini ({today}):\n\n"
 
     for i, row in df_result.head(max_items).iterrows():
         kode = row['Kode']
@@ -342,7 +346,5 @@ else:
     pesan = format_telegram_message(df_filtered)
 
     # Kirim pesan Telegram
-    BOT_TOKEN = os.getenv('BOT_TOKEN')
-    CHAT_ID = os.getenv('CHAT_ID')
     send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
 
