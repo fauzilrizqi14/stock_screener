@@ -346,5 +346,5 @@ else:
     pesan = format_telegram_message(df_filtered)
 
     # Kirim pesan Telegram
-    send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
+    send_telegram_message(BOT_TOKEN, CHAT_ID, message)
 
