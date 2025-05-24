@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
+import tempfile
 from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -21,12 +22,20 @@ market_caps_shares = dict(zip(df_shares['Kode'].astype(str), df_shares['Saham'])
 tickers = df['Kode'].dropna().astype(str) + '.JK'
 tickers = tickers.tolist()
 
-def load_config_from_sheet(sheet_name="config_screener", creds_path="credentials.json"):
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
-
+def load_config_from_sheet(sheet_name="config_screener"):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+
+    # Ambil JSON credential dari environment variable
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if not creds_json:
+        raise ValueError("Environment variable GOOGLE_CREDENTIALS_JSON tidak ditemukan!")
+
+    # Buat temporary file untuk credential
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp:
+        temp.write(creds_json)
+        temp_path = temp.name
+
+    creds = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
     client = gspread.authorize(creds)
 
     sheet = client.open(sheet_name).sheet1
@@ -60,8 +69,9 @@ def load_config_from_sheet(sheet_name="config_screener", creds_path="credentials
 
     return MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights
 
-#panggil fungsi di sheet config_screener
+# Panggil fungsi
 MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights = load_config_from_sheet()
+
 
 def format_market_cap_trillion(market_cap):
     # market_cap dalam rupiah, bagi 1 triliun (1_000_000_000_000)
