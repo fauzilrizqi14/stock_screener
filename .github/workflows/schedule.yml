@@ -2,7 +2,7 @@ name: Scheduled Screener
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # jalan tiap jam 2 pagi UTC (sesuaikan waktu)
+    - cron: '2 2 * * *'  # jalan tiap jam 2 pagi UTC (sesuaikan waktu)
   workflow_dispatch:     # buat bisa manual trigger
 
 jobs:
@@ -22,8 +22,9 @@ jobs:
           pip install -r requirements.txt
           pip install openpyxl
 
-      - name: Run Screener Script
+      - name: Run buy_screener Script
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python sinyal_beli_screener.py
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: python buy_screener.py
