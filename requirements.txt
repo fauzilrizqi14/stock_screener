@@ -2,3 +2,7 @@ yfinance
 pandas
 numpy
 requests
+openpyxl
+gspread
+oauth2client
+ta
