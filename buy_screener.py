@@ -293,7 +293,7 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
 
     return None
 
-def send_telegram_message(token, chat_id, message):
+def send_telegram_message(bot_token, chat_id, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message}
     response = requests.post(url, data=data)
@@ -346,5 +346,5 @@ else:
     pesan = format_telegram_message(df_filtered)
 
     # Kirim pesan Telegram
-    send_telegram_message(BOT_TOKEN, CHAT_ID, message)
+    send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
 
