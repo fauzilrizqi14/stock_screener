@@ -240,7 +240,7 @@ for idx, row in list_stock.iterrows():
 df_results = pd.DataFrame(results)
 if not df_results.empty:
     df_results = df_results.sort_values(by="Score", ascending=False).reset_index(drop=True)
-    display(df_results[["Stock", "Buy Price", "Target Profit", "Cut Loss", "Last Price", "Score", "Action", "Signals"]])
+    print(df_results[["Stock", "Buy Price", "Target Profit", "Cut Loss", "Last Price", "Score", "Action", "Signals"]])
 else:
     print("Tidak ada sinyal jual yang terpenuhi saat ini.")
 
