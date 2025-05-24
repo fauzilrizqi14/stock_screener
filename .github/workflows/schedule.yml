@@ -2,7 +2,7 @@ name: Scheduled Screener
 
 on:
   schedule:
-    - cron: '2 2 * * *'  # jalan tiap jam 2 pagi UTC (sesuaikan waktu)
+    - cron: '1 2 * * *'  # jalan tiap jam 2 pagi UTC (sesuaikan waktu)
   workflow_dispatch:     # buat bisa manual trigger
 
 jobs:
@@ -28,3 +28,10 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
         run: python sell_screener.py
+
+      - name: Run buy_screener Script
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: python buy_screener.py
