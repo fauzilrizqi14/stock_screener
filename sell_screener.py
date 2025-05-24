@@ -246,8 +246,8 @@ else:
 
 # --- Definisikan fungsi kirim pesan Telegram ---
 def send_telegram_message(bot_token, chat_id, message):
-    url = f"https://api.telegram.org/{BOT_TOKEN}/sendMessage"
-    data = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     response = requests.post(url, data=data)
     if response.status_code == 200:
         print("✅ Notifikasi Telegram terkirim!")
