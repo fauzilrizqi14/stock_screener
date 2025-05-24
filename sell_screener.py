@@ -1,13 +1,17 @@
+import os
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import requests
+import tempfile
+from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import pandas as pd
-import yfinance as yf
-import requests
 from ta.trend import ADXIndicator
-from datetime import datetime
 
 # --- Setup Google Sheets Access ---
 def authorize_gspread(creds_json_path="credentials.json"):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     # Ambil JSON credential dari environment variable
     creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
