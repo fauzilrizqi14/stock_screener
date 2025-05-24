@@ -260,7 +260,7 @@ def format_telegram_message_sell(df_result, max_items=25):
         return "ℹ️ Tidak ada saham yang harus dijual saat ini."
 
     today = datetime.now().strftime("%d %B %Y")
-    message = f"📈 Rekomendasi *JUAL SAHAM* Saham Hari Ini ({today}):\n\n"
+    message = f"📈 Rekomendasi *JUAL SAHAM* Hari Ini ({today}):\n\n"
 
     for i, row in df_result.head(max_items).iterrows():
         stock = row['Stock']
