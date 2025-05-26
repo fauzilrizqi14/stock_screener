@@ -1,3 +1,13 @@
-steps:
-  - name: Check current date and time
-    run: date
+name: Check Server Time
+
+on: 
+  push:          # Trigger saat push ke repo
+  # atau bisa pakai:
+  # workflow_dispatch:  # Trigger manual dari UI GitHub
+
+jobs:
+  check-time:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show current date and time
+        run: date
