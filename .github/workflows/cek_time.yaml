@@ -1,0 +1,4 @@
+steps:
+  - name: Check current date and time with Python
+    run: |
+      python -c "from datetime import datetime; print(datetime.utcnow())"
