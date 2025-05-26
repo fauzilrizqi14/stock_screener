@@ -52,20 +52,24 @@ signal_weights = {row['key']: float(row['score_weight']) for idx, row in df_sign
 signal_labels = {row['key']: row['keterangan'] for idx, row in df_signals.iterrows()}
 
 # --- Indicator Calculation Helpers ---
-
-def compute_stoch_rsi(close, rsi_length=14, stoch_length=14, k=3, d=3):
+def compute_stoch_rsi(close, rsi_period=14, stoch_period=14, k_period=3, d_period=3):
+    # Hitung perubahan harga harian
     delta = close.diff()
+    # Hitung gain dan loss
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=rsi_length).mean()
-    avg_loss = loss.rolling(window=rsi_length).mean()
+    # Rata-rata gain dan loss selama rsi_period (simple moving average atau exponential?)
+    avg_gain = gain.rolling(rsi_period).mean()
+    avg_loss = loss.rolling(rsi_period).mean()
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
-    min_rsi = rsi.rolling(window=stoch_length).min()
-    max_rsi = rsi.rolling(window=stoch_length).max()
-    stoch_rsi = (rsi - min_rsi) / (max_rsi - min_rsi)
-    k_line = stoch_rsi.rolling(window=k).mean() * 100
-    d_line = k_line.rolling(window=d).mean()
+    # Hitung stochastic RSI %K
+    min_rsi = rsi.rolling(stoch_period).min()
+    max_rsi = rsi.rolling(stoch_period).max()
+    k_line = (rsi - min_rsi) / (max_rsi - min_rsi) * 100
+    # Hitung stochastic RSI %D sebagai SMA dari %K
+    d_line = k_line.rolling(k_period).mean().rolling(d_period).mean()
+
     return k_line, d_line
 
 def is_doji_or_hammer(candle):
