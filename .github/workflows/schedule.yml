@@ -2,13 +2,16 @@ name: Scheduled Screener
 
 on:
   schedule:
-    - cron: '1 2 * * *'  # jalan tiap jam 2 pagi UTC (sesuaikan waktu)
+    - cron: '5 2 * 1-5'  # jalan tiap jam 9:05 (sesuaikan waktu)
   workflow_dispatch:     # buat bisa manual trigger
 
 jobs:
   run-screener:
     runs-on: ubuntu-latest
     steps:
+      - name: Show current date and time
+        run: TZ=Asia/Jakarta date
+        
       - name: Checkout Repo
         uses: actions/checkout@v3
 
