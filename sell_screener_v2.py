@@ -214,16 +214,17 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
             score += 1
             matched_signals.append("Cut Loss (Harga <= Cut Loss)")
 
-        # Tentukan action berdasarkan prioritas harga dan skor
-        action = None
-        if latest['Close'] >= tp2:
-            action = "Take Profit TP2"
-        elif latest['Close'] >= tp1:
-            action = "Take Profit TP1"
-        elif latest['Close'] <= cut_loss:
-            action = "Cut Loss"
-        elif score > 0:
-            action = "Take Profit"
+        # Tentukan action berdasar last price dan TP/CL
+        if latest['Close'] <= cut_loss:
+            action = "🔻 Cut Loss"
+        elif latest['Close'] > cut_loss and latest['Close'] < tp1:
+            action = "⏳ Waiting"
+        elif latest['Close'] >= tp1 and latest['Close'] < tp2:
+            action = "⬆️ Take Profit TP1"
+        elif latest['Close'] >= tp2:
+            action = "🎯 Take Profit TP2"
+        else:
+            action = None
 
         if score > 0:
             return {
@@ -304,12 +305,12 @@ def format_telegram_message_sell(df_result, max_items=25):
         signals = row['Signals']
 
         # Tentukan target CL_TP sesuai kondisi
-        if buy_price >= last_price:
-            target = f"{last_price}/{cut_loss} (CL)"
-        elif buy_price < last_price and buy_price <= tp1:
-            target = f"{last_price}/{tp1} (TP1)"
-        else:  # buy_price > tp1
-            target = f"{last_price}/{tp2} (TP2)"
+        if last_price < buy_price:
+            target = f"{last_price}/{cut_loss}"
+        elif last_price >= buy_price and last_price < tp1:
+            target = f"{last_price}/{tp1}"
+        else:  
+            target = f"{last_price}/{tp2}"
 
         message += (
             f"{i+1}. {stock} | {buy_price} |{score:.2f} | {action}\n"
