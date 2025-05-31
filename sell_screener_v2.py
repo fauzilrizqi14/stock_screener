@@ -48,7 +48,7 @@ def to_bool(val):
     return str(val).strip().lower() == "true"
 
 enabled_signals = {row['key']: to_bool(row['value']) for idx, row in df_signals.iterrows()}
-signal_weights = {row['key']: float(row['score_weight']) for idx, row in df_signals.iterrows()}
+signal_weights = {row['key']: float(row['score_weight']) if row['score_weight'] not in [None, ''] else 0.0 for idx, row in df_signals.iterrows()}
 signal_labels = {row['key']: row['keterangan'] for idx, row in df_signals.iterrows()}
 
 # --- Indicator Calculation Helpers ---
