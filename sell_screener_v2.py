@@ -97,8 +97,8 @@ def get_param(key, default=None):
             return default
     return default
 
-# Set resistance_window dari sheet, default 20 jika tidak ada
-resistance_window = get_param('resistance_window', 50)
+# Set resistance & support window dari sheet, default 20 jika tidak ada
+resistance_support_window = get_param('resistance_support_window', 50)
 
 def find_multiple_resistances(df, buy_price, last_price, window, count=2):
     recent_highs = df['High'].rolling(window=window, center=True).max()
@@ -125,6 +125,34 @@ def find_multiple_resistances(df, buy_price, last_price, window, count=2):
         result.append(resistance_1)
     if resistance_2 is not None:
         result.append(resistance_2)
+
+    return result
+
+def find_multiple_supports(df, buy_price, last_price, window, count=2):
+    recent_lows = df['Low'].rolling(window=window, center=True).min()
+    lows_below_buy = recent_lows[recent_lows < buy_price].dropna().unique()
+    lows_below_buy.sort()
+
+    support_1 = None
+    support_2 = None
+
+    if len(lows_below_buy) == 0:
+        return []
+
+    # Support pertama adalah yang terbesar di bawah buy_price
+    support_1 = lows_below_buy[-1]
+
+    # Cari support berikutnya yang < min(support_1, last_price)
+    candidate_for_sup2 = [l for l in lows_below_buy if l < min(support_1, last_price)]
+
+    if candidate_for_sup2:
+        support_2 = candidate_for_sup2[-1]
+
+    result = []
+    if support_1 is not None:
+        result.append(support_1)
+    if support_2 is not None:
+        result.append(support_2)
 
     return result
 
@@ -193,9 +221,14 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
 
         # Cari 2 resistance teratas di atas buy_price
         last_price = latest['Close']
-        resistances = find_multiple_resistances(df_hist, buy_price, last_price, window=resistance_window, count=2)
+        resistances = find_multiple_resistances(df_hist, buy_price, last_price, window=resistance_support_window, count=2)
         resistance_1 = round(resistances[0], 2) if len(resistances) > 0 else None
         resistance_2 = round(resistances[1], 2) if len(resistances) > 1 else None
+
+        supports = find_multiple_supports(df_hist, buy_price, last_price, window=resistance_support_window, count=2)
+        support_1 = round(supports[0], 2) if len(supports) > 0 else None
+        support_2 = round(supports[1], 2) if len(supports) > 1 else None
+
 
         # Hitung indikator teknikal
         df_hist['EMA9'] = df_hist['Close'].ewm(span=9, adjust=False).mean()
@@ -262,7 +295,7 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
 
         # Tentukan action berdasar last price dan TP/CL
         if latest['Close'] <= cut_loss:
-            action = "🔻 Cut Loss"
+            action = "⬇️ Cut Loss"
         elif latest['Close'] > cut_loss and latest['Close'] < tp1:
             action = "⏳ Waiting"
         elif latest['Close'] >= tp1 and latest['Close'] < tp2:
@@ -272,7 +305,7 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
         else:
             action = None
 
-        if score > 0:
+        if score >= 0:
             return {
                 "Stock": ticker,
                 "Buy Price": buy_price,
@@ -282,6 +315,8 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
                 "Take Profit TP2": round(tp2, 2),
                 "Resistance 1": resistance_1,
                 "Resistance 2": resistance_2,
+                "Support 1": support_1,
+                "Support 2": support_2,
                 "Last Price": round(latest['Close'], 2),
                 "Score": round(score, 2),
                 "Signals": ", ".join(matched_signals),
@@ -303,11 +338,12 @@ for idx, row in list_stock.iterrows():
     if res:
         results.append(res)
 
+
 # --- Display Results ---
 df_results = pd.DataFrame(results)
 if not df_results.empty:
     df_results = df_results.sort_values(by="Score", ascending=False).reset_index(drop=True)
-    print(df_results[[
+    display(df_results[[
         "Stock",
         "Buy Price",
         "Take Profit TP1",
@@ -315,6 +351,8 @@ if not df_results.empty:
         "Cut Loss",
         "Resistance 1",
         "Resistance 2",
+        "Support 1",
+        "Support 2",
         "Last Price",
         "Score",
         "Action",
@@ -353,6 +391,8 @@ def format_telegram_message_sell(df_result, max_items=25):
         signals = row['Signals']
         resistance_1 = row.get('Resistance 1', None)
         resistance_2 = row.get('Resistance 2', None)
+        support_1 = row.get('Support 1', None)
+        support_2 = row.get('Support 2', None)
 
         # Filter hanya resistance yang lebih besar dari last_price
         resistances_not_passed = []
@@ -362,6 +402,14 @@ def format_telegram_message_sell(df_result, max_items=25):
             resistances_not_passed.append(str(resistance_2))
 
         resistance_text = ", ".join(resistances_not_passed) if resistances_not_passed else "None"
+
+        # Filter support yang belum terlewati (lebih kecil dari last_price)
+        support_not_passed = []
+        if support_1 and support_1 < last_price:
+            support_not_passed.append(str(support_1))
+        if support_2 and support_2 < last_price:
+            support_not_passed.append(str(support_2))
+        support_text = ", ".join(support_not_passed) if support_not_passed else "None"
 
         # Tentukan target CL_TP sesuai kondisi
         if last_price < buy_price:
@@ -375,7 +423,8 @@ def format_telegram_message_sell(df_result, max_items=25):
             f"{i+1}. {stock} | {buy_price} |{score:.2f} | {action}\n"
             f"   ↳ {signals}\n"
             f"   🎯 Target: *{target}*\n"
-            f"   🛑 Resistance: *{resistance_text}*\n\n"
+            f"   🔺 Resistance: *{resistance_text}*\n"
+            f"   🔻 Support: *{support_text}*\n\n"
         )
     return message
     
