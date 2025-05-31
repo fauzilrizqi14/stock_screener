@@ -88,6 +88,46 @@ def is_doji_or_hammer(candle):
     is_hammer = (lower_shadow >= 2 * body) and (upper_shadow <= 0.1 * body)
     return is_doji or is_hammer
 
+def get_param(key, default=None):
+    row = df_signals[df_signals['key'] == key]
+    if not row.empty:
+        try:
+            return int(row.iloc[0]['value'])
+        except:
+            return default
+    return default
+
+# Set resistance_window dari sheet, default 20 jika tidak ada
+resistance_window = get_param('resistance_window', 50)
+
+def find_multiple_resistances(df, buy_price, last_price, window, count=2):
+    recent_highs = df['High'].rolling(window=window, center=True).max()
+    highs_above_buy = recent_highs[recent_highs > buy_price].dropna().unique()
+    highs_above_buy.sort()
+
+    resistance_1 = None
+    resistance_2 = None
+
+    if len(highs_above_buy) == 0:
+        return []
+
+    # Resistance pertama adalah yang terkecil di atas buy_price
+    resistance_1 = highs_above_buy[0]
+
+    # Cari resistance berikutnya yang > max(resistance_1, last_price)
+    candidate_for_res2 = [h for h in highs_above_buy if h > max(resistance_1, last_price)]
+
+    if candidate_for_res2:
+        resistance_2 = candidate_for_res2[0]
+
+    result = []
+    if resistance_1 is not None:
+        result.append(resistance_1)
+    if resistance_2 is not None:
+        result.append(resistance_2)
+
+    return result
+
 # --- Define signal check functions ---
 def check_macd_cross_down(prev, latest):
     return prev['MACD'] > prev['MACD_signal'] and latest['MACD'] <= latest['MACD_signal']
@@ -150,6 +190,12 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
         cut_loss = buy_price - 1.5 * atr_14
         tp1 = buy_price + 2 * (buy_price - cut_loss)
         tp2 = buy_price + 3 * (buy_price - cut_loss)
+
+        # Cari 2 resistance teratas di atas buy_price
+        last_price = latest['Close']
+        resistances = find_multiple_resistances(df_hist, buy_price, last_price, window=resistance_window, count=2)
+        resistance_1 = round(resistances[0], 2) if len(resistances) > 0 else None
+        resistance_2 = round(resistances[1], 2) if len(resistances) > 1 else None
 
         # Hitung indikator teknikal
         df_hist['EMA9'] = df_hist['Close'].ewm(span=9, adjust=False).mean()
@@ -234,6 +280,8 @@ def screen_sell_stock(ticker, buy_price, enabled_signals, signal_weights, signal
                 "Cut Loss": round(cut_loss, 2),
                 "Take Profit TP1": round(tp1, 2),
                 "Take Profit TP2": round(tp2, 2),
+                "Resistance 1": resistance_1,
+                "Resistance 2": resistance_2,
                 "Last Price": round(latest['Close'], 2),
                 "Score": round(score, 2),
                 "Signals": ", ".join(matched_signals),
@@ -255,7 +303,6 @@ for idx, row in list_stock.iterrows():
     if res:
         results.append(res)
 
-
 # --- Display Results ---
 df_results = pd.DataFrame(results)
 if not df_results.empty:
@@ -266,6 +313,8 @@ if not df_results.empty:
         "Take Profit TP1",
         "Take Profit TP2",
         "Cut Loss",
+        "Resistance 1",
+        "Resistance 2",
         "Last Price",
         "Score",
         "Action",
@@ -273,7 +322,6 @@ if not df_results.empty:
     ]])
 else:
     print("Tidak ada sinyal jual yang terpenuhi saat ini.")
-
 
 # --- Definisikan fungsi kirim pesan Telegram ---
 def send_telegram_message(bot_token, chat_id, message):
@@ -303,6 +351,17 @@ def format_telegram_message_sell(df_result, max_items=25):
         score = row['Score']
         action = row['Action']
         signals = row['Signals']
+        resistance_1 = row.get('Resistance 1', None)
+        resistance_2 = row.get('Resistance 2', None)
+
+        # Filter hanya resistance yang lebih besar dari last_price
+        resistances_not_passed = []
+        if resistance_1 is not None and resistance_1 > last_price:
+            resistances_not_passed.append(str(resistance_1))
+        if resistance_2 is not None and resistance_2 > last_price:
+            resistances_not_passed.append(str(resistance_2))
+
+        resistance_text = ", ".join(resistances_not_passed) if resistances_not_passed else "None"
 
         # Tentukan target CL_TP sesuai kondisi
         if last_price < buy_price:
@@ -315,9 +374,11 @@ def format_telegram_message_sell(df_result, max_items=25):
         message += (
             f"{i+1}. {stock} | {buy_price} |{score:.2f} | {action}\n"
             f"   ↳ {signals}\n"
-            f"   🎯 Target: *{target}*\n\n"
+            f"   🎯 Target: *{target}*\n"
+            f"   🛑 Resistance: *{resistance_text}*\n\n"
         )
     return message
+    
 # --- Kirim pesan Telegram ---
 message = format_telegram_message_sell(df_results)
 send_telegram_message(BOT_TOKEN, CHAT_ID, message)
