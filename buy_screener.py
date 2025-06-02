@@ -121,7 +121,7 @@ signal_conditions = {
         "label": "MACD cross up 0"
     },
     "macd_cross_signal": {
-        "check": lambda prev, latest: prev['MACD'] < prev['MACD_signal'] and latest['MACD'] >= latest['MACD_signal'],
+        "check": lambda prev, latest: prev['MACD'] < prev['MACD_signal'] and latest['MACD'] >= latest['MACD_signal'] and latest['MACD'] < 0,
         "bobot": 0.65,
         "label": "MACD cross up signal"
     },
