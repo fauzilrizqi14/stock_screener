@@ -2,9 +2,8 @@ name: Scheduled Screener
 
 on:
   schedule:
-   - cron: '18 0 * * *'  # jalan actual tiap jam 9:03 
    - cron: '5 2 * * *'  # jalan actual tiap jam 10:50 
-   - cron: '15 6 * * *'  # jalan actual tiap jam 15:00 
+   - cron: '0 7 * * *'  # jalan actual tiap jam 15:00 
   workflow_dispatch:     # buat bisa manual trigger
 
 jobs:
