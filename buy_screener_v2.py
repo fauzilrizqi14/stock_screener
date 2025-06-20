@@ -12,10 +12,27 @@ import os
 from ta.trend import MACD, ADXIndicator, ema_indicator
 from ta.momentum import RSIIndicator, StochRSIIndicator
 
+# --- Setup Google Sheets Access ---
+def authorize_gspread(creds_json_path="credentials.json"):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    # Ambil JSON credential dari environment variable
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if not creds_json:
+        raise ValueError("Environment variable GOOGLE_CREDENTIALS_JSON tidak ditemukan!")
+
+    # Buat temporary file untuk credential
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp:
+        temp.write(creds_json)
+        temp_path = temp.name
+
+    creds = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
+    client = gspread.authorize(creds)
+    return client
+
 # ==============================================================================
 # 1. KONFIGURASI UTAMA
 # ==============================================================================
-CREDS_FILE_PATH = os.getenv("GOOGLE_CREDENTIALS_JSON")
+CREDS_FILE_PATH = authorize_gspread
 CONFIG_SHEET_NAME = 'config_screener' # NAMA FILE GOOGLE SHEET ANDA
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
