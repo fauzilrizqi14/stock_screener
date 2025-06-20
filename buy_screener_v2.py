@@ -6,6 +6,7 @@ from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from time import sleep, time
+import os
 
 # Import pustaka Technical Analysis (ta)
 from ta.trend import MACD, ADXIndicator, ema_indicator
