@@ -7,35 +7,48 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from time import sleep, time
 import os
+import json
 
 # Import pustaka Technical Analysis (ta)
 from ta.trend import MACD, ADXIndicator, ema_indicator
 from ta.momentum import RSIIndicator, StochRSIIndicator
 
-# --- Setup Google Sheets Access ---
-def authorize_gspread(creds_json_path="credentials.json"):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Ambil JSON credential dari environment variable
-    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
-    if not creds_json:
-        raise ValueError("Environment variable GOOGLE_CREDENTIALS_JSON tidak ditemukan!")
-
-    # Buat temporary file untuk credential
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp:
-        temp.write(creds_json)
-        temp_path = temp.name
-
-    creds = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
-    client = gspread.authorize(creds)
-    return client
-
 # ==============================================================================
 # 1. KONFIGURASI UTAMA
 # ==============================================================================
-CREDS_FILE_PATH = authorize_gspread
+def authorize_gspread_from_env():
+    """Membaca kredensial dari environment variable dan mengotorisasi gspread."""
+    # Ambil JSON string dari environment variable yang di-set oleh GitHub Secrets
+    creds_json_str = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    
+    if not creds_json_str:
+        print("FATAL ERROR: Environment variable 'GOOGLE_CREDENTIALS_JSON' tidak ditemukan!")
+        print("Pastikan Anda sudah mengaturnya di bagian Secrets pada repository GitHub Anda.")
+        return None
+
+    try:
+        # Ubah JSON string menjadi dictionary
+        creds_dict = json.loads(creds_json_str)
+        
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
+        # Otorisasi menggunakan dictionary, bukan file
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        
+        print("   -> Berhasil terhubung ke Google API menggunakan environment variable.")
+        return client
+    except Exception as e:
+        print(f"   -> FATAL ERROR: Gagal melakukan otorisasi Google Sheets: {e}")
+        return None
+        
 CONFIG_SHEET_NAME = 'config_screener' # NAMA FILE GOOGLE SHEET ANDA
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
+
+# Periksa apakah token dan ID ada
+if not BOT_TOKEN or not CHAT_ID:
+    print("PERINGATAN: BOT_TOKEN atau CHAT_ID tidak ditemukan di environment variables. Notifikasi Telegram akan dinonaktifkan.")
 
 # ==============================================================================
 # 2. FUNGSI-FUNGSI
@@ -239,17 +252,15 @@ def screen_stock_processor(ticker_code, df_hist, market_caps_shares, enabled_sig
 if __name__ == "__main__":
     start_time = time()
     print("Memulai screener saham...")
+    
     print("1. Menghubungkan ke Google Sheets...")
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_FILE_PATH, scope)
-        gspread_client = gspread.authorize(creds)
-    except FileNotFoundError:
-        print(f"   -> FATAL ERROR: File kredensial '{CREDS_FILE_PATH}' tidak ditemukan.")
+    # Panggil fungsi otorisasi yang baru
+    gspread_client = authorize_gspread_from_env()
+    
+    # Hentikan program jika otorisasi gagal
+    if not gspread_client:
         exit()
-    except Exception as e:
-        print(f"   -> FATAL ERROR: Gagal terhubung ke Google API: {e}.")
-        exit()
+
     print("\n2. Memuat data dan konfigurasi...")
     MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights = load_config_from_sheet(gspread_client, CONFIG_SHEET_NAME)
     market_caps_shares, tickers_list = load_saham_from_sheet(gspread_client, CONFIG_SHEET_NAME)
