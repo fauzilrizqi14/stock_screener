@@ -147,44 +147,41 @@ def classify_entry_level(condition_keys, score, latest_indicators):
     if score > 2.0: return "Watchlist (Skor Tinggi)"
     return "Unclassified"
 
-# --- FUNGSI TELEGRAM FINAL DENGAN LOGIKA "SMART CHUNKING" ---
+# --- FUNGSI TELEGRAM VERSI DEBUG UNTUK MELACAK TOKEN ---
 def kirim_notifikasi_telegram(df_to_send, token, chat_id, max_items):
-    """Membungkus logika pengiriman Telegram dengan penanganan pesan panjang yang cerdas."""
-    if token == "GANTI_DENGAN_TOKEN_BOT_ANDA" or chat_id == "GANTI_DENGAN_CHAT_ID_ANDA":
-        print("\nPERINGATAN: BOT_TOKEN atau CHAT_ID belum diisi. Notifikasi Telegram dilewati.")
+    """Membungkus logika pengiriman Telegram dengan penanganan pesan panjang dan debug token."""
+    
+    # ========================== BAGIAN DEBUG ==========================
+    print("\n--- MEMULAI PROSES DEBUG TELEGRAM ---")
+    if token and isinstance(token, str):
+        print(f"Token yang diterima fungsi (sebagian): {token[:10]}...")
+        print(f"Panjang token yang diterima: {len(token)}")
+    else:
+        print(f"Token yang diterima fungsi TIDAK VALID atau KOSONG. Tipe: {type(token)}")
+    print("--- SELESAI PROSES DEBUG TELEGRAM ---\n")
+    # =================================================================
+
+    if not token or not chat_id or token == "GANTI_DENGAN_TOKEN_BOT_ANDA":
+        print("PERINGATAN: BOT_TOKEN tidak valid atau kosong. Notifikasi Telegram dilewati.")
         return
 
     today_str = datetime.now().strftime("%d %B %Y")
-    header = f"📈 *Rekomendasi Saham Hari Ini ({today_str})* 📈\n\n"
-    
-    # 1. Buat daftar "blok pesan" untuk setiap saham
-    message_blocks = []
+    full_message = f"📈 *Rekomendasi Saham Hari Ini ({today_str})* 📈\n\n"
     for i, row in df_to_send.head(max_items).iterrows():
         price_str = f"{row['Last Price']:,.0f}".replace(',', '.')
         support_str = f"{row['Support']:,.0f}".replace(',', '.')
         resistance_str = f"{row['Resistance']:,.0f}".replace(',', '.')
         
-        block = ""
-        block += f"*{i+1}. {row['Kode']}* | Price: {price_str} | *{row['MarketCap_Tn']}*\n"
-        block += f"   Score: *{row['Score']:.2f}* | Level: *{row['Entry Level']}*\n"
-        block += f"   S/R: *{support_str}* / *{resistance_str}*\n"
-        block += f"   ↳ _{row['Keterangan']}_\n\n"
-        message_blocks.append(block)
-
-    # 2. Rakit pesan ke dalam beberapa bagian (chunks) secara cerdas
-    chunks = []
-    current_chunk = header
-    for block in message_blocks:
-        # Jika penambahan blok baru akan melebihi batas, kirim chunk saat ini
-        if len(current_chunk) + len(block) > 4096:
-            chunks.append(current_chunk)
-            current_chunk = "*(Lanjutan...)*\n\n" # Mulai chunk baru dengan header lanjutan
-        current_chunk += block
+        full_message += f"*{i+1}. {row['Kode']}* | Price: {price_str} | *{row['MarketCap_Tn']}*\n"
+        full_message += f"   Score: *{row['Score']:.2f}* | Level: *{row['Entry Level']}*\n"
+        full_message += f"   S/R: *{support_str}* / *{resistance_str}*\n"
+        full_message += f"   ↳ _{row['Keterangan']}_\n\n"
     
-    chunks.append(current_chunk) # Jangan lupa tambahkan sisa chunk terakhir
-
-    # 3. Kirim setiap chunk satu per satu
-    url = f"https://api.telegram.org/{token}/sendMessage"
+    max_len = 4096
+    chunks = [full_message[i:i + max_len] for i in range(0, len(full_message), max_len)]
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    
     for i, chunk in enumerate(chunks):
         data = {"chat_id": chat_id, "text": chunk, "parse_mode": "Markdown"}
         try:
@@ -197,7 +194,7 @@ def kirim_notifikasi_telegram(df_to_send, token, chat_id, max_items):
             print(f"\n❌ Error koneksi saat kirim ke Telegram: {e}")
         
         if len(chunks) > 1 and i < len(chunks) - 1:
-            sleep(1) # Beri jeda 1 detik antar pengiriman jika ada lebih dari 1 pesan
+            sleep(1)
 
 
 def screen_stock_processor(ticker_code, df_hist, market_caps_shares, enabled_signals, signal_weights, MIN_MARKET_CAP, K_THRESHOLD_VALUE):
