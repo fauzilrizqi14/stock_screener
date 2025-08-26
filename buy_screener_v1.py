@@ -279,24 +279,33 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
     """
     Screens a single stock based on technical indicators and predefined signals.
     """
+    print(f"\n--- DEBUG: Memproses ticker: {ticker} ---") # Debug point 1
+
     try:
         ticker_code = ticker.replace('.JK', '')
         shares_outstanding = market_caps_shares.get(ticker_code, None)
         if shares_outstanding is None:
+            print(f"DEBUG: {ticker_code}: Saham beredar tidak ditemukan. Melewati.") # Debug point 2
             return None
 
         ticker_obj = yf.Ticker(ticker)
         hist = ticker_obj.history(period="1d")
         if hist.empty:
+            print(f"DEBUG: {ticker_code}: Data histori 1 hari kosong dari yfinance. Melewati.") # Debug point 3
             return None
         last_price = hist['Close'].iloc[-1]
+        print(f"DEBUG: {ticker_code}: Harga terakhir: {last_price:.2f}")
 
         market_cap = shares_outstanding * last_price
+        print(f"DEBUG: {ticker_code}: Kapitalisasi pasar: {market_cap:.2f} (Min: {MIN_MARKET_CAP:.2f})")
         if market_cap < MIN_MARKET_CAP:
+            print(f"DEBUG: {ticker_code}: Kapitalisasi pasar di bawah minimum. Melewati.") # Debug point 4
             return None
 
         df_hist = ticker_obj.history(period="6mo", interval="1d")
+        print(f"DEBUG: {ticker_code}: Jumlah data histori 6 bulan: {len(df_hist)} baris (Min 200)")
         if df_hist.empty or len(df_hist) < 200: # Need enough data for 200 EMA
+            print(f"DEBUG: {ticker_code}: Data histori tidak cukup untuk indikator. Melewati.") # Debug point 5
             return None
 
         # Calculate fundamental indicators
@@ -335,38 +344,49 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
 
         # Ensure there are at least two rows for 'prev' and 'latest' comparison
         if len(df_hist) < 2:
+            print(f"DEBUG: {ticker_code}: Data histori kurang dari 2 baris untuk perbandingan prev/latest. Melewati.")
             return None
 
         latest = df_hist.iloc[-1]
         prev = df_hist.iloc[-2]
 
+        print(f"DEBUG: {ticker_code}: Close: {latest['Close']:.2f}, SMA20: {latest['SMA20']:.2f}")
         # Filter: latest Close price must be above SMA20 to be considered
         if latest['Close'] <= latest['SMA20']:
+            print(f"DEBUG: {ticker_code}: Harga penutupan <= SMA20. Melewati.") # Debug point 6
             return None
 
         score = 0
         conditions_met = []
 
         # Evaluate signals based on enabled_signals and signal_conditions
+        print(f"DEBUG: {ticker_code}: Mengevaluasi sinyal...")
         for key, enabled in enabled_signals.items():
             if not enabled:
+                # print(f"DEBUG: {ticker_code}: Sinyal '{key}' dinonaktifkan.")
                 continue
 
             cond = signal_conditions.get(key)
             if cond is None:
+                print(f"DEBUG: {ticker_code}: Definisi sinyal '{key}' tidak ditemukan. Melewati.")
                 continue
 
             try:
                 if cond["check"](prev, latest):
                     score += cond.get("bobot", 0)
                     conditions_met.append(cond["label"])
+                    print(f"DEBUG: {ticker_code}: Sinyal '{key}' TERPENUHI. Bobot: {cond.get('bobot', 0)}. Skor saat ini: {score:.2f}")
+                # else:
+                    # print(f"DEBUG: {ticker_code}: Sinyal '{key}' TIDAK TERPENUHI.")
             except Exception as e:
-                print(f"⚠️ Error evaluating signal {key} on {ticker}: {e}")
+                print(f"⚠️ Error evaluasi sinyal {key} pada {ticker}: {e}")
                 continue
+        print(f"DEBUG: {ticker_code}: Total skor setelah evaluasi sinyal: {score:.2f}") # Debug point 7
 
         # Only return results for stocks with a positive score
         if score > 0:
             entry_level = classify_entry_level(conditions_met, score)
+            print(f"DEBUG: {ticker_code}: Saham lolos screening dengan skor {score:.2f} dan entry level '{entry_level}'.")
             return {
                 "Kode": ticker_code,
                 "Last Price": last_price,
@@ -375,11 +395,14 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
                 "Entry Level": entry_level,
                 "Keterangan": ", ".join(conditions_met)
             }
+        else:
+            print(f"DEBUG: {ticker_code}: Skor 0 atau kurang, tidak memenuhi kriteria akhir. Melewati.")
 
     except Exception as e:
-        print(f"❌ Error during screening for {ticker}: {e}")
+        print(f"❌ Error saat screening untuk {ticker}: {e}")
         return None
 
+    print(f"DEBUG: {ticker_code}: Akhir screening, tidak ada hasil.") # Debug point 8
     return None
 
 def send_telegram_message(bot_token, chat_id, message):
@@ -420,13 +443,16 @@ def format_telegram_message(df_result, max_items=MAX_ITEM_TELE):
 # --- Final processing and notification ---
 results = []
 
+print("\n--- Memulai proses screening saham ---")
 for t in tickers:
     res = screen_stock(t, market_caps_shares, enabled_signals, signal_conditions, MIN_MARKET_CAP)
     if res is not None:
         results.append(res)
+print("--- Proses screening saham selesai ---")
+
 
 if len(results) == 0:
-    print("❗ Tidak ada saham yang memenuhi kriteria screening.")
+    print("\n❗ Tidak ada saham yang memenuhi kriteria screening.")
 else:
     df_result = pd.DataFrame(results)
     df_result = df_result.sort_values(by=["Score", "MarketCap"], ascending=[False, False])
@@ -434,11 +460,14 @@ else:
 
     if SEND_ONLY_ABOVE_THRESHOLD:
         df_filtered = df_result[df_result["Score"] >= MIN_SCORE_THRESHOLD]
+        print(f"DEBUG: Hanya menampilkan saham dengan skor >= {MIN_SCORE_THRESHOLD:.2f}. Jumlah hasil: {len(df_filtered)}")
     else:
         df_filtered = df_result
+        print(f"DEBUG: Menampilkan semua saham dengan skor positif. Jumlah hasil: {len(df_filtered)}")
     
     df_filtered['MarketCap_Tn'] = df_filtered['MarketCap'].apply(format_market_cap_trillion)
 
+    print("\nHasil Screening Saham:")
     print(df_filtered[["Kode", "Last Price", "MarketCap_Tn", "Score", "Entry Level", "Keterangan"]])
 
     pesan = format_telegram_message(df_filtered)
