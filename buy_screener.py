@@ -50,16 +50,37 @@ def load_config_from_sheet(sheet_name="config_screener"):
         return str(val).strip().lower() == "true"
 
     # Ambil konfigurasi umum dari config_dict
-    config_dict = {}
-        for item in records:
-            if 'key' in item and 'value' in item:
-                config_dict[item['key'].strip()] = str(item['value']).strip() # Ensure value is string before strip
-
-    MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
-    SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
-    MAX_ITEM_TELE = int(config_dict.get("MAX_ITEM_TELE", 25))
-    K_THRESHOLD_VALUE = int(config_dict.get("K_THRESHOLD_VALUE", 25))
-    MIN_MARKET_CAP = float(config_dict.get("MIN_MARKET_CAP", 5_000_000_000_000))
+    def load_config_from_sheet(client, sheet_name):
+        try:
+            spreadsheet = client.open(sheet_name)
+            sheet = spreadsheet.worksheet("sinyal_beli_screener")
+            records = sheet.get_all_records()
+            def to_bool(val): return str(val).strip().lower() == "true"
+            config_dict = {str(item['key']).strip(): item['value'] for item in records if item.get('key')}
+            MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
+            SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
+            MAX_ITEM_TELE = int(config_dict.get("MAX_ITEM_TELE", 25))
+            K_THRESHOLD_VALUE = int(config_dict.get("K_THRESHOLD_VALUE", 25))
+            MIN_MARKET_CAP = float(config_dict.get("MIN_MARKET_CAP", 5_000_000_000_000))
+            enabled_signals, signal_weights = {}, {}
+            for item in records:
+                key = item.get('key')
+                if key is None or not isinstance(key, str): continue
+                key = str(key).strip()
+                if not key: continue
+                enabled_signals[key] = to_bool(item.get('value', 'False'))
+                try:
+                    signal_weights[key] = float(item.get('score_weight', 0))
+                except (TypeError, ValueError):
+                    signal_weights[key] = 0.0
+            print("   -> Berhasil memuat konfigurasi dari sheet 'sinyal_beli_screener'.")
+            return MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights
+        except gspread.exceptions.WorksheetNotFound:
+            print("   -> ERROR: Sheet dengan nama 'sinyal_beli_screener' tidak ditemukan.")
+            return 1.0, True, 25, 25, 5e12, {}, {}
+        except Exception as e:
+            print(f"   -> ERROR saat memuat konfigurasi: {e}")
+            return 1.0, True, 25, 25, 5e12, {}, {}
 
     # Ambil sinyal dan bobot dari sheet
     enabled_signals = {}
