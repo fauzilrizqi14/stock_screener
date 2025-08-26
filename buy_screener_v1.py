@@ -16,16 +16,27 @@ df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daf
 print("\n--- DEBUG DATA EXCEL ---")
 print("DEBUG: Isi awal DataFrame dari Excel (5 baris pertama):")
 print(df.head())
+print("\nDEBUG: dtypes awal DataFrame:")
+print(df.dtypes)
 
 # Ensure 'Saham' column is numeric and drop invalid data
-# Use errors='coerce' to turn non-numeric values into NaN
+# Pertama, ubah kolom 'Saham' menjadi string untuk memastikan operasi string bisa dilakukan
+df['Saham'] = df['Saham'].astype(str)
+# Hapus titik sebagai pemisah ribuan
+df['Saham'] = df['Saham'].str.replace('.', '', regex=False)
+# Sekarang konversi ke numerik, menggunakan errors='coerce' untuk nilai yang masih tidak valid
 df['Saham'] = pd.to_numeric(df['Saham'], errors='coerce')
+
+print("\nDEBUG: dtypes DataFrame setelah pembersihan dan konversi 'Saham':")
+print(df.dtypes)
 
 # Drop rows where 'Saham' is NaN after conversion
 df_shares = df[['Kode', 'Saham']].dropna(subset=['Saham'])
 
 print("\nDEBUG: DataFrame setelah konversi 'Saham' ke numerik dan drop NaN (5 baris pertama):")
 print(df_shares.head())
+if df_shares.empty:
+    print("DEBUG: PERHATIAN: df_shares KOSONG! Pastikan kolom 'Saham' di Excel berisi angka valid.")
 
 
 # Buat dict kode saham -> jumlah saham
