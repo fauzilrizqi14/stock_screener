@@ -11,7 +11,8 @@ from ta.trend import ADXIndicator
 import json # Added missing import for json
 
 # Load Excel from the provided URL
-df = pd.read_excel('[https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx](https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx)')
+# CORRECTED: Removed markdown link formatting from the URL string
+df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx')
 
 print("\n--- DEBUG DATA EXCEL ---")
 print("DEBUG: Isi awal DataFrame dari Excel (5 baris pertama):")
@@ -81,7 +82,8 @@ def authorize_gspread_from_env():
         # Ubah JSON string menjadi dictionary
         creds_dict = json.loads(creds_json_str)
         
-        scope = ["[https://spreadsheets.google.com/feeds](https://spreadsheets.google.com/feeds)", "[https://www.googleapis.com/auth/drive](https://www.googleapis.com/auth/drive)"]
+        # CORRECTED: Removed markdown link formatting from the scope URLs
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         
         # Otorisasi menggunakan dictionary, bukan file
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -487,7 +489,8 @@ def send_telegram_message(bot_token, chat_id, message):
     """
     Sends a message to a Telegram chat.
     """
-    url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){bot_token}/sendMessage"
+    # CORRECTED: Removed markdown link formatting from the URL string
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     response = requests.post(url, data=data)
     if response.status_code == 200:
