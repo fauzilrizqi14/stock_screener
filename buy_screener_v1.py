@@ -110,6 +110,12 @@ def load_config_from_sheet(client, sheet_name):
         gspread.exceptions.WorksheetNotFound: If the specific worksheet is not found.
         Exception: For general errors during Google Sheet access or parsing.
     """
+    # Define known global configuration keys to distinguish them from signals
+    GLOBAL_CONFIG_KEYS = [
+        "MIN_SCORE_THRESHOLD", "SEND_ONLY_ABOVE_THRESHOLD", "MAX_ITEM_TELE",
+        "K_THRESHOLD_VALUE", "MIN_MARKET_CAP"
+    ]
+
     try:
         spreadsheet = client.open(sheet_name)
         sheet = spreadsheet.worksheet("sinyal_beli_screener") # Assuming this is the specific worksheet
@@ -119,7 +125,7 @@ def load_config_from_sheet(client, sheet_name):
 
         # Initialize dictionaries for global configs and signal configs
         global_config_raw = {}
-        signal_config_raw = {}
+        signal_config_raw = {} # This will store items that are actual signals
 
         # Iterate through records to separate global config from signal config
         for item in records:
@@ -128,14 +134,15 @@ def load_config_from_sheet(client, sheet_name):
             key = str(key).strip()
             if not key: continue
 
-            # If 'score_weight' column exists for an item, treat it as a signal configuration
-            if 'score_weight' in item:
-                signal_config_raw[key] = item
-            else:
-                # Otherwise, treat it as a global configuration parameter
+            if key in GLOBAL_CONFIG_KEYS:
+                # This is a global configuration parameter
                 if 'value' in item:
                     global_config_raw[key] = str(item['value']).strip()
-        
+            elif 'score_weight' in item:
+                # This is a signal, store the entire item for later processing
+                signal_config_raw[key] = item
+            # else: ignore rows that are neither global config nor signals with score_weight
+
         # Extract global configurations with default values
         MIN_SCORE_THRESHOLD = float(global_config_raw.get("MIN_SCORE_THRESHOLD", 1.0))
         SEND_ONLY_ABOVE_THRESHOLD = to_bool(global_config_raw.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
@@ -146,7 +153,12 @@ def load_config_from_sheet(client, sheet_name):
         # Populate enabled_signals and signal_weights from signal_config_raw
         enabled_signals, signal_weights = {}, {}
         for key, item_data in signal_config_raw.items():
-            enabled_signals[key] = to_bool(item_data.get('value', 'False'))
+            # Only add to enabled_signals if 'value' exists in the item_data
+            if 'value' in item_data:
+                enabled_signals[key] = to_bool(item_data.get('value', 'False'))
+            else:
+                enabled_signals[key] = False # Default to False if 'value' is missing for a signal
+
             try:
                 signal_weights[key] = float(item_data.get('score_weight', 0))
             except (TypeError, ValueError):
@@ -538,3 +550,18 @@ else:
 
     pesan = format_telegram_message(df_filtered)
     send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
+```
+---
+### **Ringkasan Perubahan**
+
+Perubahan utama dilakukan dalam fungsi `load_config_from_sheet`:
+
+1.  **Daftar Kunci Konfigurasi Global**: Saya mendefinisikan `GLOBAL_CONFIG_KEYS` secara eksplisit di awal fungsi `load_config_from_sheet`. Ini adalah daftar kunci yang dikenal sebagai parameter konfigurasi umum (seperti `MIN_SCORE_THRESHOLD`, `MAX_ITEM_TELE`, dll.).
+2.  **Pemisahan Konfigurasi yang Lebih Akurat**:
+    * Saat mengiterasi `records` dari Google Sheet, kode sekarang secara tegas memeriksa apakah `key` ada di `GLOBAL_CONFIG_KEYS`. Jika ya, itu diperlakukan sebagai konfigurasi global.
+    * Jika `key` *tidak* ada di `GLOBAL_CONFIG_KEYS` dan memiliki kolom `score_weight`, maka itu diperlakukan sebagai konfigurasi sinyal.
+    * Ini mencegah parameter konfigurasi global secara keliru dimasukkan ke dalam `enabled_signals` dan `signal_weights`.
+
+Dengan perbaikan ini, `enabled_signals` dan `signal_weights` seharusnya sekarang terisi dengan benar, hanya dengan sinyal screening yang sebenarnya dari Google Sheet Anda.
+
+**Langkah Selanjutnya**: Silakan jalankan kembali skrip dengan Canvas yang diperbarui ini. Perhatikan bagian "DEBUG: Konfigurasi yang dimuat:" di output. `Enabled Signals (some)` dan `Signal Weights (some)` seharusnya sekarang menampilkan sinyal-sinyal teknis yang Anda harapkan, dan bukan lagi parameter konfigurasi global. Jika ini sudah benar, maka saham-saham yang memenuhi kriteria lain (market cap, data historis) akan mulai dievaluasi berdasarkan sinyal-sinyal terseb
