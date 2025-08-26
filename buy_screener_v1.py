@@ -11,7 +11,7 @@ from ta.trend import ADXIndicator
 import json # Added missing import for json
 
 # Load Excel from the provided URL
-df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx')
+df = pd.read_excel('[https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx](https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx)')
 
 print("\n--- DEBUG DATA EXCEL ---")
 print("DEBUG: Isi awal DataFrame dari Excel (5 baris pertama):")
@@ -81,7 +81,7 @@ def authorize_gspread_from_env():
         # Ubah JSON string menjadi dictionary
         creds_dict = json.loads(creds_json_str)
         
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        scope = ["[https://spreadsheets.google.com/feeds](https://spreadsheets.google.com/feeds)", "[https://www.googleapis.com/auth/drive](https://www.googleapis.com/auth/drive)"]
         
         # Otorisasi menggunakan dictionary, bukan file
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -487,7 +487,7 @@ def send_telegram_message(bot_token, chat_id, message):
     """
     Sends a message to a Telegram chat.
     """
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){bot_token}/sendMessage"
     data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     response = requests.post(url, data=data)
     if response.status_code == 200:
@@ -550,18 +550,3 @@ else:
 
     pesan = format_telegram_message(df_filtered)
     send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
-```
----
-### **Ringkasan Perubahan**
-
-Perubahan utama dilakukan dalam fungsi `load_config_from_sheet`:
-
-1.  **Daftar Kunci Konfigurasi Global**: Saya mendefinisikan `GLOBAL_CONFIG_KEYS` secara eksplisit di awal fungsi `load_config_from_sheet`. Ini adalah daftar kunci yang dikenal sebagai parameter konfigurasi umum (seperti `MIN_SCORE_THRESHOLD`, `MAX_ITEM_TELE`, dll.).
-2.  **Pemisahan Konfigurasi yang Lebih Akurat**:
-    * Saat mengiterasi `records` dari Google Sheet, kode sekarang secara tegas memeriksa apakah `key` ada di `GLOBAL_CONFIG_KEYS`. Jika ya, itu diperlakukan sebagai konfigurasi global.
-    * Jika `key` *tidak* ada di `GLOBAL_CONFIG_KEYS` dan memiliki kolom `score_weight`, maka itu diperlakukan sebagai konfigurasi sinyal.
-    * Ini mencegah parameter konfigurasi global secara keliru dimasukkan ke dalam `enabled_signals` dan `signal_weights`.
-
-Dengan perbaikan ini, `enabled_signals` dan `signal_weights` seharusnya sekarang terisi dengan benar, hanya dengan sinyal screening yang sebenarnya dari Google Sheet Anda.
-
-**Langkah Selanjutnya**: Silakan jalankan kembali skrip dengan Canvas yang diperbarui ini. Perhatikan bagian "DEBUG: Konfigurasi yang dimuat:" di output. `Enabled Signals (some)` dan `Signal Weights (some)` seharusnya sekarang menampilkan sinyal-sinyal teknis yang Anda harapkan, dan bukan lagi parameter konfigurasi global. Jika ini sudah benar, maka saham-saham yang memenuhi kriteria lain (market cap, data historis) akan mulai dievaluasi berdasarkan sinyal-sinyal terseb
