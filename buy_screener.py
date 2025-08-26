@@ -50,7 +50,10 @@ def load_config_from_sheet(sheet_name="config_screener"):
         return str(val).strip().lower() == "true"
 
     # Ambil konfigurasi umum dari config_dict
-    config_dict = {item['key'].strip(): item['value'] for item in records}
+    config_dict = {}
+        for item in records:
+            if 'key' in item and 'value' in item:
+                config_dict[item['key'].strip()] = str(item['value']).strip() # Ensure value is string before strip
 
     MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
     SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
