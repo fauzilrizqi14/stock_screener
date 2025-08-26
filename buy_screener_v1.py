@@ -117,24 +117,38 @@ def load_config_from_sheet(client, sheet_name):
 
         def to_bool(val): return str(val).strip().lower() == "true"
 
-        config_dict = {str(item['key']).strip(): str(item['value']).strip() for item in records if item.get('key') and item.get('value') is not None}
+        # Initialize dictionaries for global configs and signal configs
+        global_config_raw = {}
+        signal_config_raw = {}
 
-        MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
-        SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
-        MAX_ITEM_TELE = int(config_dict.get("MAX_ITEM_TELE", 25))
-        K_THRESHOLD_VALUE = int(config_dict.get("K_THRESHOLD_VALUE", 25))
-        MIN_MARKET_CAP = float(config_dict.get("MIN_MARKET_CAP", 5_000_000_000_000))
-
-        enabled_signals, signal_weights = {}, {}
+        # Iterate through records to separate global config from signal config
         for item in records:
             key = item.get('key')
             if key is None or not isinstance(key, str): continue
             key = str(key).strip()
             if not key: continue
 
-            enabled_signals[key] = to_bool(item.get('value', 'False'))
+            # If 'score_weight' column exists for an item, treat it as a signal configuration
+            if 'score_weight' in item:
+                signal_config_raw[key] = item
+            else:
+                # Otherwise, treat it as a global configuration parameter
+                if 'value' in item:
+                    global_config_raw[key] = str(item['value']).strip()
+        
+        # Extract global configurations with default values
+        MIN_SCORE_THRESHOLD = float(global_config_raw.get("MIN_SCORE_THRESHOLD", 1.0))
+        SEND_ONLY_ABOVE_THRESHOLD = to_bool(global_config_raw.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
+        MAX_ITEM_TELE = int(global_config_raw.get("MAX_ITEM_TELE", 25))
+        K_THRESHOLD_VALUE = int(global_config_raw.get("K_THRESHOLD_VALUE", 25))
+        MIN_MARKET_CAP = float(global_config_raw.get("MIN_MARKET_CAP", 5_000_000_000_000))
+
+        # Populate enabled_signals and signal_weights from signal_config_raw
+        enabled_signals, signal_weights = {}, {}
+        for key, item_data in signal_config_raw.items():
+            enabled_signals[key] = to_bool(item_data.get('value', 'False'))
             try:
-                signal_weights[key] = float(item.get('score_weight', 0))
+                signal_weights[key] = float(item_data.get('score_weight', 0))
             except (TypeError, ValueError):
                 signal_weights[key] = 0.0
 
