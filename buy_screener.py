@@ -10,7 +10,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from ta.trend import ADXIndicator
 
 # Load Excel
-df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250523.xlsx')
+df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx')
 
 # Pastikan kolom 'Saham' numeric dan drop data invalid
 df['Saham'] = pd.to_numeric(df['Saham'], errors='coerce')
