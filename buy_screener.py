@@ -26,80 +26,65 @@ tickers = tickers.tolist()
 # --- Setup Telegram ID ---    
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
+CONFIG_SHEET_NAME = 'config_screener' # NAMA FILE GOOGLE SHEET ANDA
 
-def load_config_from_sheet(sheet_name="config_screener"):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+def authorize_gspread_from_env():
+    """Membaca kredensial dari environment variable dan mengotorisasi gspread."""
+    # Ambil JSON string dari environment variable yang di-set oleh GitHub Secrets
+    creds_json_str = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    
+    if not creds_json_str:
+        print("FATAL ERROR: Environment variable 'GOOGLE_CREDENTIALS_JSON' tidak ditemukan!")
+        print("Pastikan Anda sudah mengaturnya di bagian Secrets pada repository GitHub Anda.")
+        return None
 
-    # Ambil JSON credential dari environment variable
-    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
-    if not creds_json:
-        raise ValueError("Environment variable GOOGLE_CREDENTIALS_JSON tidak ditemukan!")
+    try:
+        # Ubah JSON string menjadi dictionary
+        creds_dict = json.loads(creds_json_str)
+        
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
+        # Otorisasi menggunakan dictionary, bukan file
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        
+        print("   -> Berhasil terhubung ke Google API menggunakan environment variable.")
+        return client
+    except Exception as e:
+        print(f"   -> FATAL ERROR: Gagal melakukan otorisasi Google Sheets: {e}")
+        return None
 
-    # Buat temporary file untuk credential
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp:
-        temp.write(creds_json)
-        temp_path = temp.name
-
-    creds = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
-    client = gspread.authorize(creds)
-
-    sheet = client.open(sheet_name).sheet1
-    records = sheet.get_all_records()
-
-    def to_bool(val):
-        return str(val).strip().lower() == "true"
-
-    # Ambil konfigurasi umum dari config_dict
-    def load_config_from_sheet(client, sheet_name):
-        try:
-            spreadsheet = client.open(sheet_name)
-            sheet = spreadsheet.worksheet("sinyal_beli_screener")
-            records = sheet.get_all_records()
-            def to_bool(val): return str(val).strip().lower() == "true"
-            config_dict = {str(item['key']).strip(): item['value'] for item in records if item.get('key')}
-            MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
-            SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
-            MAX_ITEM_TELE = int(config_dict.get("MAX_ITEM_TELE", 25))
-            K_THRESHOLD_VALUE = int(config_dict.get("K_THRESHOLD_VALUE", 25))
-            MIN_MARKET_CAP = float(config_dict.get("MIN_MARKET_CAP", 5_000_000_000_000))
-            enabled_signals, signal_weights = {}, {}
-            for item in records:
-                key = item.get('key')
-                if key is None or not isinstance(key, str): continue
-                key = str(key).strip()
-                if not key: continue
-                enabled_signals[key] = to_bool(item.get('value', 'False'))
-                try:
-                    signal_weights[key] = float(item.get('score_weight', 0))
-                except (TypeError, ValueError):
-                    signal_weights[key] = 0.0
-            print("   -> Berhasil memuat konfigurasi dari sheet 'sinyal_beli_screener'.")
-            return MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights
-        except gspread.exceptions.WorksheetNotFound:
-            print("   -> ERROR: Sheet dengan nama 'sinyal_beli_screener' tidak ditemukan.")
-            return 1.0, True, 25, 25, 5e12, {}, {}
-        except Exception as e:
-            print(f"   -> ERROR saat memuat konfigurasi: {e}")
-            return 1.0, True, 25, 25, 5e12, {}, {}
-
-    # Ambil sinyal dan bobot dari sheet
-    enabled_signals = {}
-    signal_weights = {}
-
-    for item in records:
-        key = item.get('key')
-        if key is None:
-            continue
-        enabled_signals[key] = to_bool(item.get('value', 'False'))
-        try:
-            signal_weights[key] = float(item.get('score_weight', 0))
-        except (TypeError, ValueError):
-            signal_weights[key] = 0.0
-
-    return MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights
-
-# Panggil fungsi
-MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights = load_config_from_sheet()
+def load_config_from_sheet(client, sheet_name):
+    try:
+        spreadsheet = client.open(sheet_name)
+        sheet = spreadsheet.worksheet("sinyal_beli_screener")
+        records = sheet.get_all_records()
+        def to_bool(val): return str(val).strip().lower() == "true"
+        config_dict = {str(item['key']).strip(): item['value'] for item in records if item.get('key')}
+        MIN_SCORE_THRESHOLD = float(config_dict.get("MIN_SCORE_THRESHOLD", 1.0))
+        SEND_ONLY_ABOVE_THRESHOLD = to_bool(config_dict.get("SEND_ONLY_ABOVE_THRESHOLD", "True"))
+        MAX_ITEM_TELE = int(config_dict.get("MAX_ITEM_TELE", 25))
+        K_THRESHOLD_VALUE = int(config_dict.get("K_THRESHOLD_VALUE", 25))
+        MIN_MARKET_CAP = float(config_dict.get("MIN_MARKET_CAP", 5_000_000_000_000))
+        enabled_signals, signal_weights = {}, {}
+        for item in records:
+            key = item.get('key')
+            if key is None or not isinstance(key, str): continue
+            key = str(key).strip()
+            if not key: continue
+            enabled_signals[key] = to_bool(item.get('value', 'False'))
+            try:
+                signal_weights[key] = float(item.get('score_weight', 0))
+            except (TypeError, ValueError):
+                signal_weights[key] = 0.0
+        print("   -> Berhasil memuat konfigurasi dari sheet 'sinyal_beli_screener'.")
+        return MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights
+    except gspread.exceptions.WorksheetNotFound:
+        print("   -> ERROR: Sheet dengan nama 'sinyal_beli_screener' tidak ditemukan.")
+        return 1.0, True, 25, 25, 5e12, {}, {}
+    except Exception as e:
+        print(f"   -> ERROR saat memuat konfigurasi: {e}")
+        return 1.0, True, 25, 25, 5e12, {}, {}
 
 
 def format_market_cap_trillion(market_cap):
