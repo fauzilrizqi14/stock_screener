@@ -13,16 +13,43 @@ import json # Added missing import for json
 # Load Excel from the provided URL
 df = pd.read_excel('https://github.com/fauzilrizqi14/stock_screener/raw/main/Daftar%20Saham%20%20-%2020250826.xlsx')
 
+print("\n--- DEBUG DATA EXCEL ---")
+print("DEBUG: Isi awal DataFrame dari Excel (5 baris pertama):")
+print(df.head())
+
 # Ensure 'Saham' column is numeric and drop invalid data
+# Use errors='coerce' to turn non-numeric values into NaN
 df['Saham'] = pd.to_numeric(df['Saham'], errors='coerce')
+
+# Drop rows where 'Saham' is NaN after conversion
 df_shares = df[['Kode', 'Saham']].dropna(subset=['Saham'])
 
-# Create dictionary of stock code -> number of shares
+print("\nDEBUG: DataFrame setelah konversi 'Saham' ke numerik dan drop NaN (5 baris pertama):")
+print(df_shares.head())
+
+
+# Buat dict kode saham -> jumlah saham
+# Ensure 'Kode' is treated as string for dictionary keys
 market_caps_shares = dict(zip(df_shares['Kode'].astype(str), df_shares['Saham']))
 
-# List of tickers for yfinance (append '.JK' for Jakarta Stock Exchange)
+print("\nDEBUG: Isi dari market_caps_shares (beberapa entri pertama):")
+# Print a limited number of dictionary items for debugging
+for i, (k, v) in enumerate(market_caps_shares.items()):
+    if i < 10: # Print first 10 items
+        print(f"  '{k}': {v}")
+    else:
+        break
+if not market_caps_shares:
+    print("  (Kamus market_caps_shares kosong!)")
+
+
+# List ticker buat yfinance
 tickers = df['Kode'].dropna().astype(str) + '.JK'
 tickers = tickers.tolist()
+
+print(f"\nDEBUG: Contoh ticker untuk yfinance (5 ticker pertama): {tickers[:5]}")
+print(f"DEBUG: Total jumlah ticker yang akan diproses: {len(tickers)}")
+
 
 # --- Setup Telegram ID ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -120,6 +147,15 @@ if gspread_client is None:
 
 # Load configurations using the authorized client
 MIN_SCORE_THRESHOLD, SEND_ONLY_ABOVE_THRESHOLD, MAX_ITEM_TELE, K_THRESHOLD_VALUE, MIN_MARKET_CAP, enabled_signals, signal_weights = load_config_from_sheet(gspread_client, CONFIG_SHEET_NAME)
+
+print(f"\nDEBUG: Konfigurasi yang dimuat:")
+print(f"  MIN_SCORE_THRESHOLD: {MIN_SCORE_THRESHOLD}")
+print(f"  SEND_ONLY_ABOVE_THRESHOLD: {SEND_ONLY_ABOVE_THRESHOLD}")
+print(f"  MAX_ITEM_TELE: {MAX_ITEM_TELE}")
+print(f"  K_THRESHOLD_VALUE: {K_THRESHOLD_VALUE}")
+print(f"  MIN_MARKET_CAP: {MIN_MARKET_CAP}")
+print(f"  Enabled Signals (some): {dict(list(enabled_signals.items())[:5])}...") # Print first 5 enabled signals
+print(f"  Signal Weights (some): {dict(list(signal_weights.items())[:5])}...") # Print first 5 signal weights
 
 
 def format_market_cap_trillion(market_cap):
@@ -283,9 +319,14 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
 
     try:
         ticker_code = ticker.replace('.JK', '')
+        # DEBUG: Check if ticker_code is in market_caps_shares
+        if ticker_code not in market_caps_shares:
+            print(f"DEBUG: {ticker_code}: TIDAK DITEMUKAN di market_caps_shares. Melewati.") # More specific debug
+            return None
+
         shares_outstanding = market_caps_shares.get(ticker_code, None)
-        if shares_outstanding is None:
-            print(f"DEBUG: {ticker_code}: Saham beredar tidak ditemukan. Melewati.") # Debug point 2
+        if shares_outstanding is None: # This check is now redundant if the above passes, but kept for safety
+            print(f"DEBUG: {ticker_code}: Saham beredar tidak ditemukan (internal error). Melewati.") # Debug point 2
             return None
 
         ticker_obj = yf.Ticker(ticker)
@@ -297,7 +338,7 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
         print(f"DEBUG: {ticker_code}: Harga terakhir: {last_price:.2f}")
 
         market_cap = shares_outstanding * last_price
-        print(f"DEBUG: {ticker_code}: Kapitalisasi pasar: {market_cap:.2f} (Min: {MIN_MARKET_CAP:.2f})")
+        print(f"DEBUG: {ticker_code}: Kapitalisasi pasar: {format_market_cap_trillion(market_cap)} (Min: {format_market_cap_trillion(MIN_MARKET_CAP)})") # Formatted for readability
         if market_cap < MIN_MARKET_CAP:
             print(f"DEBUG: {ticker_code}: Kapitalisasi pasar di bawah minimum. Melewati.") # Debug point 4
             return None
@@ -305,7 +346,7 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
         df_hist = ticker_obj.history(period="6mo", interval="1d")
         print(f"DEBUG: {ticker_code}: Jumlah data histori 6 bulan: {len(df_hist)} baris (Min 200)")
         if df_hist.empty or len(df_hist) < 200: # Need enough data for 200 EMA
-            print(f"DEBUG: {ticker_code}: Data histori tidak cukup untuk indikator. Melewati.") # Debug point 5
+            print(f"DEBUG: {ticker_code}: Data histori tidak cukup untuk indikator (membutuhkan setidaknya 200 hari untuk EMA200). Melewati.") # Debug point 5
             return None
 
         # Calculate fundamental indicators
@@ -350,10 +391,10 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
         latest = df_hist.iloc[-1]
         prev = df_hist.iloc[-2]
 
-        print(f"DEBUG: {ticker_code}: Close: {latest['Close']:.2f}, SMA20: {latest['SMA20']:.2f}")
+        print(f"DEBUG: {ticker_code}: Harga Penutupan: {latest['Close']:.2f}, SMA20: {latest['SMA20']:.2f}")
         # Filter: latest Close price must be above SMA20 to be considered
         if latest['Close'] <= latest['SMA20']:
-            print(f"DEBUG: {ticker_code}: Harga penutupan <= SMA20. Melewati.") # Debug point 6
+            print(f"DEBUG: {ticker_code}: Harga penutupan ({latest['Close']:.2f}) kurang dari atau sama dengan SMA20 ({latest['SMA20']:.2f}). Melewati.") # Debug point 6
             return None
 
         score = 0
@@ -375,7 +416,7 @@ def screen_stock(ticker, market_caps_shares, enabled_signals, signal_conditions,
                 if cond["check"](prev, latest):
                     score += cond.get("bobot", 0)
                     conditions_met.append(cond["label"])
-                    print(f"DEBUG: {ticker_code}: Sinyal '{key}' TERPENUHI. Bobot: {cond.get('bobot', 0)}. Skor saat ini: {score:.2f}")
+                    print(f"DEBUG: {ticker_code}: Sinyal '{key}' TERPENUHI. Bobot: {cond.get('bobot', 0):.2f}. Skor saat ini: {score:.2f}")
                 # else:
                     # print(f"DEBUG: {ticker_code}: Sinyal '{key}' TIDAK TERPENUHI.")
             except Exception as e:
@@ -472,4 +513,3 @@ else:
 
     pesan = format_telegram_message(df_filtered)
     send_telegram_message(BOT_TOKEN, CHAT_ID, pesan)
-
